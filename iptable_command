@@ -83,7 +83,8 @@ eg:iptables -t filter -I FORWARD -p tcp -s 192.168.80.123/32 -d 192.168.10.123/3
 
 03==================================================扩展匹配选项
 
--m icmp --icmp-type(echo-request/echo-reply)
+参数 -m icmp 
+    --icmp-type(echo-request/echo-reply)
 
 #禁止客户端117.101.6.53/32 ping通，而自己能够ping通客户端
 iptables -t filter -I INPUT -s 117.101.6.53/32 -p icmp -m icmp --icmp-type echo-request -j DROP
@@ -103,7 +104,8 @@ target     prot opt source               destination
 
 
 基于状态检测的包过滤,指定检测哪种状态
--m state --state(NEW/ESTATBLISHED/INVALID/RELATED)
+参数 -m state 
+     --state(NEW/ESTATBLISHED/INVALID/RELATED)
 
 NEW:表明改包想要建立一个新的连接
 ESTATBLISHED:改包属于某个已经建立的连接
@@ -118,6 +120,43 @@ iptables -t filter -I OUTPUT -m state --state NEW -j DROP
 
 
 
+参数 -m multiport
+指定多端口号,貌似不加"s"也行啊..
+-m multiport
+	--sports
+	--dports
+	--ports
+
+eg: 拒绝 192.168.80.0/24 访问 192.168.10.0/24 1-1024 3389 端口
+
+#路由服务器上设置
+iptables -t filter -I FORWARD -p tcp -s 192.168.80.0/24 -d 192.168.10.0/24 -m multiport --dports 1:1024,3389 -j DROP
+
+#在服务器设置不让117.101.6.0/24访问该服务器的50-1024,3389端口
+iptables -t filter -I INPUT -p tcp -s 117.101.6.0/24 -m multiport --dports 50:1024,3389 -j DROP
 
 
+指定IP段(并不是一个网段，可能是网段中的几个)
+-m iprange
+    --src-range ip-ip
+    --dst-range ip-ip
 
+eg: 禁止192.168.1.1-100地址段 访问192.168.10.0/24
+
+#路由上设置
+iptables -t filter -I FORWARD -p tcp -m iprange --src-range 117.101.6.50-117.101.6.52 -d 192.168.10.0/24 --dport 80 -j DROP
+#在服务器上设置
+iptables -t filter -I INPUT -p tcp -m iprange --src-range 117.101.6.50-117.101.6.52 --dport 80 -j DROP
+
+
+最大连接数限定
+-m connlimit
+    --connlimit-above  限定最大连接数
+
+eg: 当源地址为192.168.80.0/24且远程桌面连接192.168.10.123/32时 最多两个会话
+
+#路由服务器上设置允许192.168.80.0/24使用远程桌面连接192.168.10.123/32 最多3个会话
+iptables -t filter -I FORWARD -s 192.168.80.0/24 -d 192.168.10.123/32 -p tcp --dport 3389 -m connlimit --connlimit-above 2 -j DROP
+
+#服务器上设置只能有3个ssh连接
+iptables -t filter -I INPUT -s 117.101.6.53 -p tcp --dport 22 -m connlimit --connlimit-above 2 -j DROP
