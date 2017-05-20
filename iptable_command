@@ -1,4 +1,4 @@
-==================================================iptables命令介绍:
+01==================================================iptables命令介绍:
 
 iptables -t table 命令 chain rules -j target
 
@@ -6,38 +6,30 @@ iptables -t table 命令 chain rules -j target
 table可以是filter,nat,mangle 默认是filter
 
 命令:
+
 -P 或 --policy  定义默认策略(ACCEPT/DROP)
+
 [root@zwj iptables]# iptables -L
 Chain INPUT (policy ACCEPT)
 target     prot opt source               destination
-
 Chain FORWARD (policy ACCEPT)
 target     prot opt source               destination
-
 Chain OUTPUT (policy ACCEPT)
 target     prot opt source               destination
-[root@zwj iptables]#
-[root@zwj iptables]#
-[root@zwj iptables]#
-[root@zwj iptables]#
-[root@zwj iptables]#
 [root@zwj iptables]# iptables -t filter --policy  FORWARD DROP
 [root@zwj iptables]# iptables -L
 Chain INPUT (policy ACCEPT)
 target     prot opt source               destination
-
 Chain FORWARD (policy DROP)
 target     prot opt source               destination
-
 Chain OUTPUT (policy ACCEPT)
 target     prot opt source               destination
 
 -A 或 --append  在规则列表里最后追加一条规则
 
-
-
 -I 或 --insert  在制定位置插入一条规则
-#禁止ping
+#禁止客户端ping自己(把客户端的echo request丢掉不处理),自己ping客户端能够成功，但是视而不见（自己把客户端的echo reply丢弃了）
+#表面来看就是相互ping都有问题
 [root@zwj iptables]# iptables -t filter -I INPUT -p icmp -j DROP
 [root@zwj iptables]#
 [root@zwj iptables]# iptables -L
@@ -52,33 +44,78 @@ Chain OUTPUT (policy ACCEPT)
 target     prot opt source               destination
 
 
+
 -D 或 --delete  删除一条规则
+
 eg: iptables -t filter -D INPUT 2 
 
-
 -R 或 --replace 替换一条规则
+
 eg: iptables -t filter -R INPUT 2 -p icmp -j DROP
 
 -F 或  --flush 删除所有规则
+
 eg: iptables -t filter -F INPUT #清楚filter表，INPUT链的规则
 eg: iptables -t filter -F       #清除filter表左右的链的规则
 
-==================================================iptables匹配选项
+
+
+02==================================================iptables匹配选项
 
 -i或--in-interface 制定数据包从哪一个网络接口进入，入ppp0,eth0,eth1
-eg:iptables -t filter I INPUT -p icmp -i eth1 -j DROP    #使路由服务器的eth1 ping不通
-
-
 -o或--out-interface
 -p或--protocol 协议类型 制定数据包匹配的协议，tcp,udp,icmp
 -s或--source 制定数据匹配的原地址
-eg:iptables -t filter -I FORWARD -p tcp -s 192.168.80.123/32 -d 192.168.10.123/32 --dport 3389 -j DROP  #路由服务器禁止192.168.80.123/32 通过3389端口远程登录192.168.10.123/32
-eg: iptables -t filter -I FORWARD -s 192.168.80.0/24 -d 192.168.10.0/24
-#会让上面的失效
-
 -d或--destination 制定数据匹配的目的地址
 --sport 源端口号，指定数据包匹配的源端口号，可以使用"起始端口号:结束端口号"的格式制定一个范围的端口
 --dport 目标端口号，指定数据包匹配的目标端口号，可以使用"起始端口号:结束端口号"的格式制定一个范围的端口
+
+#使路由服务器的eth1 ping不通
+eg:iptables -t filter I INPUT -p icmp -i eth1 -j DROP    
+
+#路由服务器禁止192.168.80.123/32 通过3389端口远程登录192.168.10.123/32
+eg:iptables -t filter -I FORWARD -p tcp -s 192.168.80.123/32 -d 192.168.10.123/32 --dport 3389 -j DROP  
+
+
+
+
+
+
+03==================================================扩展匹配选项
+
+-m icmp --icmp-type(echo-request/echo-reply)
+
+#禁止客户端117.101.6.53/32 ping通，而自己能够ping通客户端
+iptables -t filter -I INPUT -s 117.101.6.53/32 -p icmp -m icmp --icmp-type echo-request -j DROP
+[root@zwj ~]# iptables -L
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination         
+DROP       icmp --  117.101.6.53         anywhere            icmp echo-request 
+
+Chain FORWARD (policy ACCEPT)
+target     prot opt source               destination         
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination 
+
+#在路由上设置 禁止某一网络到另一网络的ping   ,使用FORWAR链   
+[root@zwj ~]# iptables -t filter -I FORWARD -s 117.101.6.0/24 -d 123.206.96.0/24 -p icmp -m icmp --icmp-type echo-request -j DROP
+
+
+基于状态检测的包过滤,指定检测哪种状态
+-m state --state(NEW/ESTATBLISHED/INVALID/RELATED)
+
+NEW:表明改包想要建立一个新的连接
+ESTATBLISHED:改包属于某个已经建立的连接
+INVALID:改包的连接编号（SessionID）无法识别或编号不正确
+RELATED:表示该包属于某个已经建立的连接
+
+#单方向建立回话，不让服务器(192.168.10.0)主动与客户端（192.168.80.0/24）建立链接
+iptables -t filter -I FORWARD -s 192.168.10.0/24 -d 192.168.80.0/24 -m state --state NEW -j DROP
+
+#在指定服务器上设置单向链接,服务器只能被动链接客户端
+iptables -t filter -I OUTPUT -m state --state NEW -j DROP
+
 
 
 

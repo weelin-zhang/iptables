@@ -2,3 +2,19 @@ iptables -t filter  -A OUTPUT -p tcp -d 10.121.64.23 -j ACCEPT
 iptables -t filter  -A OUTPUT -p tcp -d 10.120.248.131 -j ACCEPT
 iptables -t filter -A INPUT -s 10.121.64.23 -p tcp -j ACCEPT
 iptables -t filter -A INPUT -s 10.120.248.131 -p tcp -j ACCEPT
+
+#在路由服务器上设置单向ping
+iptables -t filter -I FORWARD -s 117.101.6.0/24 -d 123.206.96.0/24 -p icmp -m icmp --icmp-type echo-request -j DROP
+
+#在单机上设置单向ping
+iptables -t filter -I INPUT -s 117.101.6.0/32 -p icmp -m icmp --icmp-type echo-request -j DROP
+
+#路由服务器禁止192.168.80.123/32 通过3389端口远程登录192.168.10.123/32
+eg:iptables -t filter -I FORWARD -p tcp -s 192.168.80.123/32 -d 192.168.10.123/32 --dport 3389 -j DROP  
+
+
+#单方向建立回话，不让服务器(192.168.10.0)主动与客户端（192.168.80.0/24）建立链接
+iptables -t filter -I FORWARD -s 192.168.10.0/24 -d 192.168.80.0/24 -m state --state NEW -j DROP
+
+#在指定服务器上设置单向链接,服务器只能被动链接客户端
+iptables -t filter -I OUTPUT -m state --state NEW -j DROP
