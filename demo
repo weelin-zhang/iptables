@@ -1,0 +1,4 @@
+iptables -t filter  -A OUTPUT -p tcp -d 10.121.64.23 -j ACCEPT
+iptables -t filter  -A OUTPUT -p tcp -d 10.120.248.131 -j ACCEPT
+iptables -t filter -A INPUT -s 10.121.64.23 -p tcp -j ACCEPT
+iptables -t filter -A INPUT -s 10.120.248.131 -p tcp -j ACCEPT
