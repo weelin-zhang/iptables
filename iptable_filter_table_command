@@ -160,3 +160,76 @@ iptables -t filter -I FORWARD -s 192.168.80.0/24 -d 192.168.10.123/32 -p tcp --d
 
 #服务器上设置只能有3个ssh连接
 iptables -t filter -I INPUT -s 117.101.6.53 -p tcp --dport 22 -m connlimit --connlimit-above 2 -j DROP
+
+限速
+-m limit --limit
+用来控制某段时间内封包的平均流量 单位为xx/second xx/minute xx/day xx/hour
+
+eg:192.168.10.0/24 每秒钟向192.168.80.0/24发送数据包不超过300个(每个包最大1500byte),约等于1500*300=450K
+
+#路由服务器上设置如下
+iptables -t filter	-I FORWARD -s 192.168.10.0/24 -d 192.168.80.0/24 -m limit --limit 300/second -j ACCEPT
+iptables -t filter	-A FORWARD -s 192.168.10.0/24 -d 192.168.80.0/24 -j ACCEPT -j DROP
+
+#设置往123.xxx.96.xxx服务器上传文件速度..
+iptables -t filter -I  INPUT -s 117.101.6.53 -m limit --limit 300/second -j ACCEPT
+iptables -t filter -A  INPUT -s 117.101.6.53 -j DROP
+
+
+瞬间流量控制
+参数 -m limit
+    --limit-burst number
+
+iptables -t filter -Z  #清楚计数器
+表示前number个包不会受 -m limit --limit 300/second 限制,多快多慢都无所谓,超过number后遵循300限制
+
+#使用ping测试burst功能,ping请求4icmp包后，就开始出现"Request timeout"
+iptables -t filter -I INPUT -p icmp -s 117.101.6.53 -m limit --limit 3/hour --limit-burst 4 -j ACCEPT
+iptables -t filter -A INPUT -p icmp -s 117.101.6.53 -j DROP
+
+
+参数 -m mac
+    --mac-source
+
+eg: iptables -t filter -I FORWARD -d 192.168.80.0/24 -m mac --mac-source 00:00:00:00:00:01 -j DROP
+
+
+
+=======================================iptables 处理动作
+
+-j 参数指定要进行的处理动作，常用的处理动作包括：ACCEPT,DROP,REDIRECT,MASQUERADE,REJECT,LOG,DNAT,SNAT,MIRROR,QUEUE,RETURN,MARK.
+
+filter表常用动作:
+
+ACCEPT: 放行封包,进行完该动作时，将不在匹配其它规则，直接跳往下一个规则链
+REJECT: 阻拦该封包，并弄个包通知对方，可以传送的封包有几个选择,port unreable,icmp echo-reply,tcp-reset(这个封包会要求对方关闭连接),进行完处理动作后不在匹配其它规则，直接中断过滤程序.
+DROP: 丢弃包不予处理，进行完处理动作后，不在匹配其它规则，直接中断程序
+LOG: 将封包相关信息记录在/var/log中，进行完处理动作后，继续匹配其它规则.
+
+REJECT示例:
+iptables -t filter -I INPUT -p icmp -s 117.101.6.53 -j REJECT 
+
+-->ping 123.206.96.111
+PING 123.206.96.111 (123.206.96.111): 56 data bytes
+92 bytes from 123.206.96.111: Destination Port Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 65be   0 0000  37  01 809a 192.168.0.107  123.206.96.111 
+
+Request timeout for icmp_seq 0
+92 bytes from 123.206.96.111: Destination Port Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 bcd7   0 0000  37  01 2981 192.168.0.107  123.206.96.111 
+
+LOG示例:
+
+iptables -t filter -I INPUT -s 117.101.6.53 -p tcp --dport 80 -j DROP
+iptables -t filter -I INPUT -s 117.101.6.53 -p tcp --dport 80 -j LOG --log-prefix "try to access port 80"
+
+[root@zwj log]# tail -n 5 messages
+May 21 23:20:26 zwj kernel: [442783.112294] try to access port 80IN=eth0 OUT= MAC=52:54:00:2f:0c:c9:fe:ee:ff:ff:ff:ff:08:00 SRC=117.101.6.53 DST=10.141.41.84 LEN=64 TOS=0x00 PREC=0x00 TTL=55 ID=7823 DF PROTO=TCP SPT=28028 DPT=80 WINDOW=65535 RES=0x00 SYN URGP=0 
+May 21 23:20:30 zwj kernel: [442787.116150] try to access port 80IN=eth0 OUT= MAC=52:54:00:2f:0c:c9:fe:ee:ff:ff:ff:ff:08:00 SRC=117.101.6.53 DST=10.141.41.84 LEN=48 TOS=0x00 PREC=0x00 TTL=55 ID=20251 DF PROTO=TCP SPT=28028 DPT=80 WINDOW=65535 RES=0x00 SYN URGP=0 
+May 21 23:20:38 zwj kernel: [442795.125573] try to access port 80IN=eth0 OUT= MAC=52:54:00:2f:0c:c9:fe:ee:ff:ff:ff:ff:08:00 SRC=117.101.6.53 DST=10.141.41.84 LEN=48 TOS=0x00 PREC=0x00 TTL=55 ID=32025 DF PROTO=TCP SPT=28028 DPT=80 WINDOW=65535 RES=0x00 SYN URGP=0 
+May 21 23:20:54 zwj kernel: [442811.133633] try to access port 80IN=eth0 OUT= MAC=52:54:00:2f:0c:c9:fe:ee:ff:ff:ff:ff:08:00 SRC=117.101.6.53 DST=10.141.41.84 LEN=48 TOS=0x00 PREC=0x00 TTL=55 ID=37974 DF PROTO=TCP SPT=28028 DPT=80 WINDOW=65535 RES=0x00 SYN URGP=0 
+May 21 23:21:26 zwj kernel: [442843.267985] try to access port 80IN=eth0 OUT= MAC=52:54:00:2f:0c:c9:fe:ee:ff:ff:ff:ff:08:00 SRC=117.101.6.53 DST=10.141.41.84 LEN=48 TOS=0x00 PREC=0x00 TTL=55 ID=51685 DF PROTO=TCP SPT=28028 DPT=80 WINDOW=65535 RES=0x00 SYN URGP=0 
+
+

@@ -1,0 +1,14 @@
+/etc/rc.d/init.d/iptables save #保存到/etc/sysconfig/iptables
+
+
+#备份现有的iptables rules到iptables1.conf中	
+iptables-save > iptables1.conf
+
+...
+...
+中间开始搞一波修改，如果出错可以还原
+iptables-restore < iptables1.conf
+...
+...
+中间开始搞一波修改，如果没有出错可以
+/etc/rc.d/init.d/iptables save

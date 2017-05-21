@@ -37,3 +37,26 @@ iptables -t filter -I FORWARD -s 192.168.80.0/24 -d 192.168.10.123/32 -p tcp --d
 
 #服务器上设置只能有3个ssh连接
 iptables -t filter -I INPUT -s 117.101.6.53 -p tcp --dport 22 -m connlimit --connlimit-above 2 -j DROP
+
+
+#路由服务器上设置如下
+iptables -t filter	-I FORWARD -s 192.168.10.0/24 -d 192.168.80.0/24 -m limit --limit 300/second -j ACCEPT
+iptables -t filter	-A FORWARD -s 192.168.10.0/24 -d 192.168.80.0/24 -j ACCEPT -j DROP
+
+#设置往123.xxx.96.xxx服务器上传文件速度..
+iptables -t filter -I  INPUT -s 117.101.6.53 -m limit --limit 300/second -j ACCEPT
+iptables -t filter -A  INPUT -s 117.101.6.53 -j DROP
+
+
+#使用ping测试burst功能,ping请求4icmp包后，就开始出现"Request timeout"
+iptables -t filter -I INPUT -p icmp -s 117.101.6.53 -m limit --limit 3/hour --limit-burst 4 -j ACCEPT
+iptables -t filter -A INPUT -p icmp -s 117.101.6.53 -j DROP
+
+#REJECT 阻拦封包后，还会发一个包通知对方.
+iptables -t filter -I INPUT -p icmp -s 117.101.6.53 -j REJECT 
+
+
+#路由服务器上使用REJECT
+iptables -t filter -I FORWARD -s 192.168.10.0/24 -d 192.168.80.0/24 -p tcp --dport 3389 -j REJECT
+
+
