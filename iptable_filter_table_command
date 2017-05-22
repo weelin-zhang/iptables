@@ -233,3 +233,34 @@ May 21 23:20:54 zwj kernel: [442811.133633] try to access port 80IN=eth0 OUT= MA
 May 21 23:21:26 zwj kernel: [442843.267985] try to access port 80IN=eth0 OUT= MAC=52:54:00:2f:0c:c9:fe:ee:ff:ff:ff:ff:08:00 SRC=117.101.6.53 DST=10.141.41.84 LEN=48 TOS=0x00 PREC=0x00 TTL=55 ID=51685 DF PROTO=TCP SPT=28028 DPT=80 WINDOW=65535 RES=0x00 SYN URGP=0 
 
 
+
+recent模块实现服务器网络安全
+常用设置:
+--name :设定列表名称
+--rsource :源地址，默认
+--rdest :目的地址
+--seconds :指定时间内
+--hitcount :命中次数
+--set :将地址添加进列表，并更新信息，包含地址加入的时间戳
+--rcheck :检查地址是否在列表，以第一个匹配开始计算时间
+--update :和rcheck类似，以最后一个匹配计算时间
+--remove :在表里删除相应地址，后跟列表名称及地址
+
+
+eg:服务器限制一个客户端使用SSH在60秒内只允许连接2次
+
+iptables -t filter -A INPUT -p tcp --dport 22 -m state --state NEW -m recent --name SSHPOOL --rcheck --seconds 60 --hitcount 2 -j DROP
+
+iptables -t filter -A INPUT -p tcp --dport 22 -m state --state NEW -m recent --name SSHPOOL --set -j ACCEPT
+
+eg:限制TCP 80端口60秒内每个IP只能发起10个新连接，超过后记录到日志中，并丢掉数据 包，可防止CC(客户端使用代理服务器)以及非伪造IP的syn flood.
+
+iptables -t filter -A INPUT -p tcp --dport 80 --syn -m recent --name webpool --rcheck --seconds 60 --hitcount 10 -j LOG --log-prefix 'DDOS:' --log-ip-options
+iptables -t filter -A INPUT -p tcp --dport 80 --syn -m recent --name webpool --rcheck --seconds 60 --hitcount 10 -j DROP 
+iptables -t filter -A INPUT -p tcp --dport 80 --syn -m recent --name webpool --set -j ACCEPT
+
+
+
+
+
+

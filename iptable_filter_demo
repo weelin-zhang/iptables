@@ -60,3 +60,11 @@ iptables -t filter -I INPUT -p icmp -s 117.101.6.53 -j REJECT
 iptables -t filter -I FORWARD -s 192.168.10.0/24 -d 192.168.80.0/24 -p tcp --dport 3389 -j REJECT
 
 
+eg:服务器限制一个客户端使用SSH在60秒内只允许连接2次
+iptables -t filter -A INPUT -p tcp --dport 22 -m state --state NEW -m recent --name SSHPOOL --rcheck --seconds 60 --hitcount 2 -j DROP
+iptables -t filter -A INPUT -p tcp --dport 22 -m state --state NEW -m recent --name SSHPOOL --set -j ACCEPT
+
+eg:限制TCP 80端口60秒内每个IP只能发起10个新连接，超过后记录到日志中，并丢掉数据 包，可防止CC(客户端使用代理服务器)以及非伪造IP的syn flood.
+iptables -t filter -A INPUT -p tcp --dport 80 --syn -m recent --name webpool --rcheck --seconds 60 --hitcount 10 -j LOG --log-prefix 'DDOS:' --log-ip-options
+iptables -t filter -A INPUT -p tcp --dport 80 --syn -m recent --name webpool --rcheck --seconds 60 --hitcount 10 -j DROP 
+iptables -t filter -A INPUT -p tcp --dport 80 --syn -m recent --name webpool --set -j ACCEPT
